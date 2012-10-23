@@ -102,7 +102,8 @@ def log(channelname, text):
       os.mkdir(os.path.join(_logsdir, channel[1:]))
       directories.append(channel)
    if TimeStamp: 
-      t = time.strftime('[%H:%M]', time.gmtime(time.time()))
+      #t = time.strftime('[%H:%M]', time.gmtime(time.time()))
+      t = time.strftime('[%H:%M]', time.localtime(time.time()))
       text = t + ' ' + text
    text += '\n'
    open(os.path.join(_logsdir, channel[1:], fn), 'a').write(text)
@@ -222,7 +223,7 @@ def main(hostName, port, chan):
       if '!' in origin: nick = origin.split('!')[0]
       topic = _topic % (nick, text)
       log(channel, topic)
-   c.bind(logTopic, 'TOPIC', r"(.*)")
+   #c.bind(logTopic, 'TOPIC', r"(.*)")
 
    def logMode(m, origin, args, text, c=c): 
       channel = args[1]
@@ -230,7 +231,7 @@ def main(hostName, port, chan):
       if '!' in origin: nick = origin.split('!')[0]
       mode = _mode % (nick, ' '.join(args[2:]))
       log(channel, mode)
-   c.bind(logMode, 'MODE', r"(.*)")
+   #c.bind(logMode, 'MODE', r"(.*)")
 
    def logJoin(m, origin, args, text, c=c): 
       channel = text
@@ -252,7 +253,7 @@ def main(hostName, port, chan):
          if channel not in people[nick]: 
             people[nick].append(channel)
       else: people[nick] = [channel]
-   c.bind(logJoin, 'JOIN', r"(.*)")
+   #c.bind(logJoin, 'JOIN', r"(.*)")
 
    def logNames(m, origin, args, text, c=c): 
       channel = args[3]
@@ -282,7 +283,7 @@ def main(hostName, port, chan):
       try: people[nick].remove(channel)
       except: 
          print >> sys.stderr, "Something messed up, but it doesn't matter, for ", nick, " parting from ", channel
-   c.bind(logPart, 'PART', r"(.*)")
+   #c.bind(logPart, 'PART', r"(.*)")
 
    def logQuit(m, origin, args, text, c=c): 
       nick = origin
@@ -291,7 +292,7 @@ def main(hostName, port, chan):
       if people.has_key(nick): 
          for channel in people[nick]: log(channel, quit)
          del people[nick]
-   c.bind(logQuit, 'QUIT', r"(.*)")
+   #c.bind(logQuit, 'QUIT', r"(.*)")
 
    def logKick(m, origin, args, text, c=c): 
       channel = args[1]
@@ -307,7 +308,7 @@ def main(hostName, port, chan):
       try: people[kickee].remove(channel)
       except: 
          print >> sys.stderr, "Something messed up, but it doesn't matter, for ", kickee, " kicked from ", channel
-   c.bind(logKick, 'KICK', r"(.*)")
+   #c.bind(logKick, 'KICK', r"(.*)")
 
    def logNick(m, origin, args, text, c=c): 
       old = origin
@@ -318,11 +319,11 @@ def main(hostName, port, chan):
          for channel in people[old]: log(channel, nick)
          people[new] = people[old]
          del people[old]
-   c.bind(logNick, 'NICK', r"(.*)")
+   #c.bind(logNick, 'NICK', r"(.*)")
 
    def logInvite(m, origin, args, text, c=c): 
       c.todo([JOIN, text])
-   c.bind(logInvite, 'INVITE', r"(.*)")
+   #c.bind(logInvite, 'INVITE', r"(.*)")
 
    # inits
    if not os.access(_logsdir, os.W_OK): os.makedirs(_logsdir)

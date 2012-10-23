@@ -10,8 +10,27 @@ fi
 logsdir=${logsdir:-/var/log/irclogger}
 passfile=${passfile:-/var/www/passwds/irclogger-passwds}
 private_image="${private_image:-<img src='http://colaz.net/qbullets/private.gif' width=11 height=10 alt='Password-protected log'>}"
-nl='
-'
+apache_group_file=${apache_group_file:-/home/blazanis/irclogger/auth/groups}
+apache_user_file=${apache_user_file:-/home/blazanis/irclogger/auth/users}
+apache_conf_file=${apache_conf_file:-/etc/apache2/sites-enabled/ircdlogger}
+nl=''
+
+# $1=chan
+channel_allowed () {
+auth_ok=0
+groups=`cat $apache_conf_file | grep /bin/irclogger_log/$1 -A 5 | grep "Require group" | sed 's/Require group//g'`
+for group in $groups
+do 
+	users=`cat $apache_group_file | grep $group | awk 'BEGIN {FS=":"};{print $2}'`	
+        for user in $users
+	do
+		if [ $user == $REMOTE_USER ]; then auth_ok=1; fi
+	done
+done
+echo $auth_ok
+#return auth_ok
+}
+
 
 # $1=chan / return true if protected, false if free access
 acces_protected () {

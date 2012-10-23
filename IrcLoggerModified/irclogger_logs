@@ -76,6 +76,7 @@ if [ -z "$CHAN" ]; then
 $MESS
 <p>
 <tt><ul>"
+echo "<h2>Welcome, ${REMOTE_USER[@]^}</h2>"
   protected_chans=" "
   while read line;do protected_chans="$protected_chans${line%%:*} "
   done < "$passfile"
@@ -85,9 +86,12 @@ $MESS
       case "$protected_chans" in *" $chan "*)
 	if protectable "$chan";then auth=_a; lock="$private_image";fi;; 
       esac
-      echo "<li><a href='irclogger_logs$auth/$chan'>$chan</a> $lock (<a href='${SCRIPT_NAME%/*}/irclogger_log/$chan'>today log</a>, <a href='${SCRIPT_NAME%/*}/irclogger_log_search/$chan'>search</a>)"
+      if [ `channel_allowed $chan` == 1 ]; then       
+        echo "<li><a href='irclogger_logs$auth/$chan'>$chan</a> $lock (<a href='${SCRIPT_NAME%/*}/irclogger_log/$chan'>today log</a>, <a href='${SCRIPT_NAME%/*}/irclogger_log_search/$chan'>search</a>)"
+      fi
     fi
   done
+  echo "</ul></tt><hr>$backlink<small><i><a href='${SCRIPT_NAME%/*}/irclogger_log_search/ALL'>search all</a></i></small></body></html>"
   echo "</ul></tt><hr>$backlink<small><i><a href='http://colas.nahaboo.net/Software/IrcLogger'>irclogger</a></i></small></body></html>"
   exit 0
 fi
