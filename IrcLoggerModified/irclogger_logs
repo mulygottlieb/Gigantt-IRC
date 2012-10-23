@@ -1,0 +1,154 @@
+#!/bin/bash
+# irclogger v1.1
+# append /-cc to url to clean the cached list of logs
+set -a
+
+# this depends on your locale
+SUNDAY=`date -d '1970/01/04' +'%a'`
+
+CHAN=${PATH_INFO#/}
+. irclogger_common
+cachedir="${cachedir:-/tmp/.irclogger_logs_cache}"
+if test "x$CHAN" = "x-cc"; then
+  rm -rf "$cachedir"
+  echo "Location: ${SCRIPT_NAME%/}"
+fi
+
+if test ! -d $logsdir/$CHAN; then
+  echo 'Content-type: text/html; charset: ISO-8859-1';echo
+  echo "Cannot list channel $CHAN (no dir $logsdir/$CHAN)"
+  exit 0
+fi
+STYLE=
+cd $logsdir
+if [ -e style.css ]; then STYLE="`cat style.css`";fi
+cd $logsdir/$CHAN
+if [ -e style.css ]; then STYLE="$STYLE`cat style.css`";fi
+if [ -e message.html ]; then MESS="`cat message.html`"; fi
+
+lines () {
+  ls=`grep -v '^[[][0-9][0-9]:[0-9][0-9][]] [*][*][*] ' $1|wc -l`
+  let ln=ls;  echo $ln
+}
+
+page () {
+  cat << EOF	
+Content-type: text/html; charset: ISO-8859-1
+
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  <head>
+    <title>#${CHAN} irc log</title>
+    <style type='text/css'> $STYLE </style>
+  </head>
+  <body>
+    <h1>#${CHAN} irc log</h1>$locked
+<a href='${SCRIPT_NAME%/*}/irclogger_logs'>&uarr;back</a>
+<a href='${SCRIPT_NAME%/*}/irclogger_log_search/$CHAN'>Search</a>
+$MESS
+<p>Files are stored in raw text in MIRC format by 
+<a href='http://colas.nahaboo.net/Software/IrcLogger'>irclogger</a>
+<br>$passwd_ops
+<hr>
+<ul>
+$(cat)
+</ul>
+    <hr>
+<a name=end href='${SCRIPT_NAME%/*}/irclogger_logs'>&uarr;back</a>
+<a href='${SCRIPT_NAME%/*}/irclogger_log_search/$CHAN'>Search</a>
+</body>
+</html>
+EOF
+}
+
+#-----------------------------------------------------------------------------
+# list all channels if none given
+if test -n "$top"; then backlink="<a href='$top'>&uarr;back</a><p>"
+else backlink=
+fi
+if [ -z "$CHAN" ]; then 
+  echo "Content-Type: text/html"; echo
+  echo "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML//EN\">"
+  echo "<html><head><title>Logs of IRC channels</title>
+    <meta http-equiv='Content-Type' content='text/html; charset=ISO-8859-1'>
+    <style type='text/css'> $STYLE </style>
+</head><body><h1>Logs of IRC Channels</h1> $backlink
+$MESS
+<p>
+<tt><ul>"
+  protected_chans=" "
+  while read line;do protected_chans="$protected_chans${line%%:*} "
+  done < "$passfile"
+  for chan in $(ls -1 .|sort -i|while read f;do if [ -d "$f" ]; then echo "$f";fi;done); do
+    auth=; lock=
+    if [ -d "$chan" ]; then
+      case "$protected_chans" in *" $chan "*)
+	if protectable "$chan";then auth=_a; lock="$private_image";fi;; 
+      esac
+      echo "<li><a href='irclogger_logs$auth/$chan'>$chan</a> $lock (<a href='${SCRIPT_NAME%/*}/irclogger_log/$chan'>today log</a>, <a href='${SCRIPT_NAME%/*}/irclogger_log_search/$chan'>search</a>)"
+    fi
+  done
+  echo "</ul></tt><hr>$backlink<small><i><a href='http://colas.nahaboo.net/Software/IrcLogger'>irclogger</a></i></small></body></html>"
+  exit 0
+fi
+
+#-----------------------------------------------------------------------------
+# else list all logs in one chan
+
+#check perms
+if acces_protected "$CHAN"
+then passwd_ops=""
+  locked="$private_image<p>"
+else 
+  if protectable "$CHAN"
+  then passwd_ops=""
+  else passwd_ops="Public logs."
+  fi
+  locked=
+fi
+
+todaydate="`date -u +'%Y-%m-%d'`"
+oldweek=`date -u +'%V'`
+
+#cache is lines: L[YYYYMMDD]="html-of-entry"
+ccahedirchan="${cachedir}`/bin/pwd`"
+if test ! -d "$ccahedirchan"; then mkdir -p "$ccahedirchan"; fi
+oldcache="$ccahedirchan/logs"
+newcache="$ccahedirchan/logs.$$"
+if test -e "$oldcache"; then source "$oldcache";fi
+
+#important: all log entries must be on a single line
+ls -1r *.log* | while read log; do 
+  ymd="${log%%,*}";num="${ymd//-/}"
+  if test -n "${L[num]}"; then #cached
+    echo "${L[num]}"; echo "L[$num]=\"${L[num]}\"" >>"$newcache"
+  else
+    date=${log%%.*};day="${date##*,}"
+    week=`date -d $ymd +'%V'`;weeksep=
+    if [ $oldweek != $week ]; then weeksep='</ul><ul>'
+    fi
+    oldweek=$week
+    if [ $day = Sun -o $day = Sat ]
+    then ss='<span class=weekend>';es='</span>'
+    else ss=;es=
+    fi
+    lines=`lines $log`
+    url="${SCRIPT_NAME%/*}/irclogger_log/$CHAN?date=$date"
+    entry="$weeksep<li>$ss<a href='$url'>$ymd</a>, <tt>$day</tt> <small>($lines lines)</small> (alternate forms: <a href='${SCRIPT_NAME%/*}/irclogger_log/$CHAN?date=$date&raw=on'>raw text</a>, <a href='${SCRIPT_NAME%/*}/irclogger_log/$CHAN?date=$date&tml=on'>TML syntax</a>, <a href='${SCRIPT_NAME%/*}/irclogger_log/$CHAN?date=$date&text=on'>contents only</a>, <a href='${SCRIPT_NAME%/*}/irclogger_log/$CHAN?date=$date&urls=true'>urls only</a>)$es"
+    if test "$entry" = "$cached_entry"; then
+      cat "$oldcache"; rm -f "$newcache"; break
+    fi
+    if test "$ymd" = "$todaydate"; then 
+      entry="$entry <b>(today)</b>"
+    else
+      echo "L[$num]=\"$entry\"" >>"$newcache"
+    fi
+    echo "$entry"
+  fi
+done | page
+if test -e "$newcache";then mv "$newcache" "$oldcache"; fi
+
+### EMACS MODES
+### Local Variables: ***
+### mode:ksh ***
+### End: ***
